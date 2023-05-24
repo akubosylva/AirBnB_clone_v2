@@ -58,13 +58,12 @@ def do_deploy(archive_path):
 
         # Create a new symbolic link /data/web_static/current
         run('ln -s {} /data/web_static/current'.format(releases_path))
-        
+
         # Restart Nginx to apply changes
         run('sudo service nginx restart')
-        
+
         print("New version deployed!")
         return True
     except Exception as e:
         print("An exception occurred: {}".format(e))
         return False
-
