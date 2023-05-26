@@ -1,69 +1,36 @@
 #!/usr/bin/python3
-""" Fabfile to distribute an archive to a web server.(deploy)
-(pack) -generates a .tgz archive from the web_static/ content.
 """
-from datetime import datetime
-from fabric.api import *
-from os import path
-
-env.hosts = ['54.89.119.49', '54.194.114.89']
-env.user = 'ubuntu'
-
-
-def do_pack():
-    """Creates a gzipped tar archive from the web_static/ content"""
-    try:
-        if not path.exists("versions"):
-            local('mkdir versions')
-        now = datetime.utcnow()
-        ft = now.strftime("%Y%m%d%H%M%S")
-        archive_path = "versions/web_static_{}.tgz".format(ft)
-        local("tar -cvzf {}  web_static/".format(archive_path))
-        return archive_path
-    except Exception as e:
-        print("An exception occurred: {}".format(e))
-        return None
+Fabric script method:
+    do_deploy: deploys archive to webservers
+Usage:
+    fab -f 2-do_deploy_web_static.py
+    do_deploy:archive_path=versions/web_static_20170315003959.tgz
+    -i my_ssh_private_key -u ubuntu
+"""
+from fabric.api import env, put, run
+import os.path
+env.hosts = ['54.89.119.49', '54.197.114.89']
 
 
 def do_deploy(archive_path):
-    """Distributes an archive to a web server.
-    params:
-        archive_path (str): The path of the archive to distribute.
-    Returns:
-        If the file doesn't exist at archive_path or an error occurs - False.
-        Otherwise - True.
     """
-    if not path.exists(archive_path):
+    Deploy archive to web server
+    """
+    if os.path.isfile(archive_path) is False:
         return False
     try:
-        tgz_file = archive_path.split('/')[-1]
-        fname = tgz_file.split('.')[0]
-
-        # Upload the archive to /tmp/ directory on the web server
-        put(archive_path, '/tmp/')
-
-        releases_path = "/data/web_static/releases/{}/".format(fname)
-        run("mkdir -p {}".format(releases_path))
-
-        # uncompress archive and delete .tgz
-        run("tar -xzf /tmp/{} -C {}".format(tgz_file, releases_path))
-        run("rm /tmp/{}".format(tgz_file))
-
-        # Place web_static directory correctly
-        run("mv {}/web_static/* {}".format(releases_path, releases_path))
-        run("rm -rf {}web_static".format(releases_path))
-
-        # Delete the symbolic link /data/web_static/current if it exists
-        run('rm -rf /data/web_static/current')
-
-        # Create a new symbolic link /data/web_static/current
-        run('ln -s {} /data/web_static/current'.format(releases_path))
-
-        # Restart Nginx to apply changes
-        run('sudo service nginx restart')
-
-        print("New version deployed!")
+        filename = archive_path.split("/")[-1]
+        no_ext = filename.split(".")[0]
+        path_no_ext = "/data/web_static/releases/{}/".format(no_ext)
+        symlink = "/data/web_static/current"
+        put(archive_path, "/tmp/")
+        run("mkdir -p {}".format(path_no_ext))
+        run("tar -xzf /tmp/{} -C {}".format(filename, path_no_ext))
+        run("rm /tmp/{}".format(filename))
+        run("mv {}web_static/* {}".format(path_no_ext, path_no_ext))
+        run("rm -rf {}web_static".format(path_no_ext))
+        run("rm -rf {}".format(symlink))
+        run("ln -s {} {}".format(path_no_ext, symlink))
         return True
-    except Exception as e:
-        print("An exception occurred: {}".format(e))
+    except:
         return False
